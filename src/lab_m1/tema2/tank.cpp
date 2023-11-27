@@ -21,6 +21,8 @@ Tank::Tank(glm::vec3& center)
 	color[WHEELS] = tankColors[GRAY];
 
 	HP = 3;
+	numLives = 3;
+	deltaTimeShooting = Engine::GetElapsedTime();
 	radius = 1; // One unit in the grid
 	speed = 2.f;
 }
@@ -66,6 +68,22 @@ void Tank::Rotate_OZ(float angle, TankComponent component)
 {
 	right[component] = glm::normalize(glm::vec3(glm::rotate(glm::mat4(1), angle, forward[component]) * glm::vec4(right[component], 1)));
 	up[component] = glm::normalize(glm::vec3(glm::rotate(glm::mat4(1), angle, forward[component]) * glm::vec4(up[component], 1)));
+}
+
+void Tank::Rotate(float angle)
+{
+	Rotate_OY(angle, BODY);
+	Rotate_OY(angle, TURRET);
+	Rotate_OY(angle, WHEELS);
+	Rotate_OY(angle, MACHINE_GUN);
+}
+
+void Tank::FollowDir(glm::vec3& dir, TankComponent component)
+{
+	forward[component] = dir;
+	right[component] = glm::normalize(glm::vec3(glm::rotate(glm::mat4(1), RADIANS(-90), up[component]) *
+		glm::vec4(forward[component], 1)));
+	up[component] = glm::cross(right[component], forward[component]);
 }
 
 glm::mat4 Tank::GetModelMatrix(TankComponent component)

@@ -123,14 +123,24 @@ void Tema2::Init()
 
     GenerateBuildings();
     GenerateEnemies();
+ 
+    perspectiveCamera = new player::Camera();
+    perspectiveCamera->FollowTarget(tank->position, 0);
 
-    camera = new player::Camera();
-    camera->FollowTarget(tank->position, 0);
+    orthoCamera = new player::Camera(glm::vec3(0, 10, 0), glm::vec3(0, 0, 0), glm::vec3(0, 0, -1), true);
+    orthoCamera->FollowTarget(tank->position, 0);
 
-    totalGameTime = 60 + Engine::GetElapsedTime();
+    camera = perspectiveCamera;
+
+    totalGameTime = 80 + Engine::GetElapsedTime();
     score = 0;
 
-    fov = RADIANS(60);
+    top = 4.0f;
+    bottom = -top;
+    right = top * window->props.aspectRatio;
+    left = -right;
+
+    fov = RADIANS(80);
     zNear = 0.01f;
     zFar = 200.0f;
 
@@ -138,25 +148,33 @@ void Tema2::Init()
 
     {
         Shader* shader = new Shader("TankShader");
-        shader->AddShader(PATH_JOIN(window->props.selfDir, SOURCE_PATH::M1, "tema2", "shaders", "VertexShaderTank.glsl"), GL_VERTEX_SHADER);
-        shader->AddShader(PATH_JOIN(window->props.selfDir, SOURCE_PATH::M1, "tema2", "shaders", "FragmentShaderTank.glsl"), GL_FRAGMENT_SHADER);
+        shader->AddShader(PATH_JOIN(window->props.selfDir, SOURCE_PATH::M1, "tema2",
+                                            "shaders", "VertexShaderTank.glsl"), GL_VERTEX_SHADER);
+        shader->AddShader(PATH_JOIN(window->props.selfDir, SOURCE_PATH::M1, "tema2",
+                                            "shaders", "FragmentShaderTank.glsl"), GL_FRAGMENT_SHADER);
         shader->CreateAndLink();
         shaders[shader->GetName()] = shader;
     }
 
     {
         Shader* shader = new Shader("PlainShader");
-        shader->AddShader(PATH_JOIN(window->props.selfDir, SOURCE_PATH::M1, "tema2", "shaders", "VertexShader.glsl"), GL_VERTEX_SHADER);
-        shader->AddShader(PATH_JOIN(window->props.selfDir, SOURCE_PATH::M1, "tema2", "shaders", "FragmentShader.glsl"), GL_FRAGMENT_SHADER);
+        shader->AddShader(PATH_JOIN(window->props.selfDir, SOURCE_PATH::M1, "tema2",
+                                            "shaders", "VertexShader.glsl"), GL_VERTEX_SHADER);
+        shader->AddShader(PATH_JOIN(window->props.selfDir, SOURCE_PATH::M1, "tema2", "shaders",
+                                            "FragmentShader.glsl"), GL_FRAGMENT_SHADER);
         shader->CreateAndLink();
         shaders[shader->GetName()] = shader;
     }
 
-    projectionMatrix = glm::perspective(fov, window->props.aspectRatio, zNear, zFar);
-
     // Load font for text
     textRenderer = new gfxc::TextRenderer(window->props.selfDir, window->GetResolution().x, window->GetResolution().y);
     textRenderer->Load(PATH_JOIN(window->props.selfDir, RESOURCE_PATH::FONTS, "game1.ttf"), 18);
+
+    glm::ivec2 resolution = window->GetResolution();
+    miniViewportArea = ViewportArea(50, 50, resolution.x / 5.f, resolution.y / 5.f);
+
+    // Cursor at gun
+    window->SetPointerPosition(resolution.x / 2, resolution.y / 2 - 100);
 }
 
 void Tema2::RenderBuilding(Building& building)
@@ -186,7 +204,7 @@ void Tema2::RenderTank(Tank &tank)
         }
 
         glm::mat4 modelMatrix = glm::mat4(1);
-        modelMatrix = glm::translate(modelMatrix, projectile->computePosition(Engine::GetElapsedTime()));
+        modelMatrix = glm::translate(modelMatrix, projectile->computePosition());
         modelMatrix = glm::scale(modelMatrix, glm::vec3(projectile->scale));
         RenderMesh(meshes["projectile"], shaders["PlainShader"], modelMatrix, glm::vec3(0, 0, 0));
     }
@@ -200,7 +218,7 @@ bool Tema2::AreColliding(Tank& t1, Tank& t2, float &distance)
 
 bool Tema2::AreColliding(Tank& t, Projectile& p)
 {
-    return (glm::distance(t.position, p.computePosition(Engine::GetElapsedTime())) < t.radius + p.radius);
+    return (glm::distance(t.position, p.computePosition()) < t.radius + p.radius);
 }
 
 bool Tema2::AreColliding(Tank& t, Building& b, float& distance)
@@ -233,7 +251,7 @@ bool Tema2::AreColliding(Tank& t, Building& b, float& distance)
 
 bool Tema2::AreColliding(Building& b, Projectile& p)
 {
-    glm::vec3 projectile_pos = p.computePosition(Engine::GetElapsedTime());
+    glm::vec3 projectile_pos = p.computePosition();
     
     // The projectile is over the building
     if (projectile_pos.z > b.position.z + b.radius.z) {
@@ -265,6 +283,31 @@ bool Tema2::AreColliding(Building& b, Projectile& p)
     return false;
 }
 
+void Tema2::RenderAll()
+{
+    RenderTank(*tank);
+
+    // Render enemies
+    for (auto& enemy = enemies.begin(); enemy != enemies.end(); enemy++) {
+        if (enemy->HP <= 0) {
+            enemy->speed = 0;
+        }
+
+        RenderTank(*enemy);
+    }
+
+    // Render buildings
+    for (auto& building : buildings) {
+        RenderBuilding(building);
+    }
+
+    // Render terrain
+    {
+        glm::mat4 modelMatrix = glm::mat4(1);
+        RenderMesh(meshes["terrain"], shaders["PlainShader"], modelMatrix, glm::vec3(0.27, 0.83, 0.42));
+    }
+}
+
 void Tema2::FrameStart()
 {
     // Clears the color buffer (using the previously set color) and depth buffer
@@ -278,10 +321,36 @@ void Tema2::FrameStart()
 
 void Tema2::Update(float deltaTimeSeconds)
 {
-    if (totalGameTime - Engine::GetElapsedTime() <= 0 || tank->HP <= 0) {
+    if (totalGameTime - Engine::GetElapsedTime() <= 0 || tank->numLives <= 0) {
         textRenderer->RenderText(std::string("Game Over"), 450, 320, 1.5f, glm::vec3(0, 1, 0));
         textRenderer->RenderText(std::string("Total Score: ") + to_string(score), 450, 350, 1.5f, glm::vec3(0, 1, 0));
         return;
+    }
+
+    camera = perspectiveCamera;
+    projectionMatrix = glm::perspective(fov, window->props.aspectRatio, zNear, zFar);
+
+    /* ENEMY ATTACKS */
+    for (auto& enemy : enemies) {
+        if (!enemy.HP) {
+            continue;
+        }
+
+        if (glm::distance(tank->position, enemy.position) < 7) {
+            glm::vec3 dir = glm::normalize(tank->position - enemy.position);
+
+            if (dir != enemy.forward[TURRET]) {
+                enemy.FollowDir(dir, TURRET);
+                enemy.FollowDir(dir, MACHINE_GUN);
+            }
+
+            if (enemy.deltaTimeShooting - Engine::GetElapsedTime() < 0) {
+                glm::vec3 gun_rel_pos = glm::vec3(0, 0.56, 0) + enemy.forward[MACHINE_GUN];
+                enemy.projectiles.push_back(Projectile(enemy.position + gun_rel_pos, enemy.forward[MACHINE_GUN]));
+
+                enemy.deltaTimeShooting = 2.f + Engine::GetElapsedTime();
+            }
+        }
     }
 
     /* COLLISIONS */
@@ -297,11 +366,16 @@ void Tema2::Update(float deltaTimeSeconds)
         }
     }
 
-    // Projectile - Tank collisions
+    // Projectile - Enemy collisions
     for (auto& projectile = tank->projectiles.begin(); projectile != tank->projectiles.end(); projectile++) {
         for (auto& enemy : enemies) {
             if (AreColliding(enemy, *projectile)) {
                 enemy.HP--;
+
+                if (enemy.HP == 0) {
+                    score++;
+                }
+
                 enemy.HP = enemy.HP < 0 ? 0 : enemy.HP;
 
                 projectile = tank->projectiles.erase(projectile);
@@ -314,7 +388,24 @@ void Tema2::Update(float deltaTimeSeconds)
         break;
     }
 
-    // TODO: Enemy projectiles - Tank collisions
+    // Enemy projectiles - Tank collisions
+    for (auto& enemy : enemies) {
+        for (auto& projectile = enemy.projectiles.begin(); projectile != enemy.projectiles.end(); projectile++) {
+            if (AreColliding(*tank, *projectile)) {
+                tank->numLives--;
+
+                if (tank->numLives <= 0) {
+                    tank->speed = 0;
+                }
+
+                projectile = enemy.projectiles.erase(projectile);
+
+                if (projectile == enemy.projectiles.end()) {
+                    break;
+                }
+            }
+        }
+    }
 
     // Tank - Building collisions
     for (auto& building : buildings) {
@@ -353,29 +444,17 @@ void Tema2::Update(float deltaTimeSeconds)
 
     /* RENDERING */
     
-    RenderTank(*tank);
+    RenderAll();
 
-    // Render enemies
-    for (auto& enemy = enemies.begin(); enemy != enemies.end(); enemy++) {
-        if (enemy->HP <= 0) {
-            enemy->speed = 0;
-        }
+    // MiniViewport
+    glClear(GL_DEPTH_BUFFER_BIT);
+    glViewport(miniViewportArea.x, miniViewportArea.y, miniViewportArea.width, miniViewportArea.height);
 
-        RenderTank(*enemy);
-    }
+    camera = orthoCamera;
+    projectionMatrix = glm::ortho(left, right, bottom, top, zNear, zFar);
 
-    // Render buildings
-    for (auto& building : buildings) {
-        RenderBuilding(building);
-    }
-
-    // Render terrain
-    {
-        glm::mat4 modelMatrix = glm::mat4(1);
-        RenderMesh(meshes["terrain"], shaders["PlainShader"], modelMatrix, glm::vec3(0.27, 0.83, 0.42));
-    }
+    RenderAll();
 }
-
 
 void Tema2::FrameEnd()
 {
@@ -432,29 +511,26 @@ void Tema2::OnInputUpdate(float deltaTime, int mods)
 {
     if (window->KeyHold(GLFW_KEY_W)) {
         tank->MoveForward(deltaTime);
-        camera->FollowTarget(tank->position, 0);
+        perspectiveCamera->FollowTarget(tank->position, 0);
+        orthoCamera->FollowTarget(tank->position, 0);
     }
 
     if (window->KeyHold(GLFW_KEY_A)) {
-        tank->Rotate_OY(deltaTime * tank->speed, BODY);
-        tank->Rotate_OY(deltaTime * tank->speed, TURRET);
-        tank->Rotate_OY(deltaTime * tank->speed, WHEELS);
-        tank->Rotate_OY(deltaTime * tank->speed, MACHINE_GUN);
-
-        camera->FollowTarget(tank->position, -deltaTime * tank->speed);
+        tank->Rotate(deltaTime * tank->speed);
+        perspectiveCamera->FollowTarget(tank->position, -deltaTime * tank->speed);
+        orthoCamera->FollowTarget(tank->position, -deltaTime * tank->speed);
     }
 
     if (window->KeyHold(GLFW_KEY_S)) {
         tank->MoveBackward(deltaTime);
-        camera->FollowTarget(tank->position, 0);
+        perspectiveCamera->FollowTarget(tank->position, 0);
+        orthoCamera->FollowTarget(tank->position, 0);
     }
 
     if (window->KeyHold(GLFW_KEY_D)) {
-         tank->Rotate_OY(-deltaTime * tank->speed, BODY);
-         tank->Rotate_OY(-deltaTime * tank->speed, TURRET);
-         tank->Rotate_OY(-deltaTime * tank->speed, WHEELS);
-         tank->Rotate_OY(-deltaTime * tank->speed, MACHINE_GUN);
-         camera->FollowTarget(tank->position, deltaTime * tank->speed);
+         tank->Rotate(-deltaTime * tank->speed);
+         perspectiveCamera->FollowTarget(tank->position, deltaTime * tank->speed);
+         orthoCamera->FollowTarget(tank->position, deltaTime * tank->speed);
     }
 }
 
@@ -469,14 +545,13 @@ void Tema2::OnKeyRelease(int key, int mods)
     // Add key release event
 }
 
-
 void Tema2::OnMouseMove(int mouseX, int mouseY, int deltaX, int deltaY)
 {
-    float sensivityOX = 0.001f;
+    float sensivityOX = 0.002f;
     float sensivityOY = 0.001f;
     if (window->MouseHold(GLFW_MOUSE_BUTTON_RIGHT)) {
-        camera->RotateThirdPerson_OX(deltaY * sensivityOX);
-        camera->RotateThirdPerson_OY(deltaX * sensivityOY);
+        perspectiveCamera->RotateThirdPerson_OX(deltaY * sensivityOX);
+        perspectiveCamera->RotateThirdPerson_OY(deltaX * sensivityOY);
     }
     else 
     {
@@ -486,13 +561,13 @@ void Tema2::OnMouseMove(int mouseX, int mouseY, int deltaX, int deltaY)
     }
 }
 
-
 void Tema2::OnMouseBtnPress(int mouseX, int mouseY, int button, int mods)
 {
-    if (IS_BIT_SET(button, GLFW_MOUSE_BUTTON_LEFT)) {
+    if (IS_BIT_SET(button, GLFW_MOUSE_BUTTON_LEFT) && tank->deltaTimeShooting - Engine::GetElapsedTime() <= 0) {
         /* Relative front of the gun position */
         glm::vec3 gun_rel_pos = glm::vec3(0, 0.56, 0) + tank->forward[MACHINE_GUN];
         tank->projectiles.push_back(Projectile(tank->position + gun_rel_pos, tank->forward[MACHINE_GUN]));
+        tank->deltaTimeShooting = 1.5f + Engine::GetElapsedTime();
     }
 }
 

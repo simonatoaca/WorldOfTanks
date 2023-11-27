@@ -5,11 +5,13 @@ in vec3 frag_position;
 in vec3 frag_normal;
 in vec3 frag_coordinate;
 in vec3 frag_color;
+flat in int frag_HP;
 
 // Output
 layout(location = 0) out vec4 out_color;
 
 void main()
 {
-    out_color = vec4(frag_color, 1);
+    vec3 new_color = frag_color + (3 - frag_HP) * vec3(0.2, 0.1, 0.1);
+    out_color = vec4(new_color, 1);
 }

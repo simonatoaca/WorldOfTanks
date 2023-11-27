@@ -18,6 +18,7 @@ out vec3 frag_position;
 out vec3 frag_normal;
 out vec3 frag_tex_coords;
 out vec3 frag_color;
+flat out int frag_HP;
 
 void main()
 {
@@ -27,6 +28,7 @@ void main()
     frag_normal = v_normal;
     frag_tex_coords = v_tex_coords;
     frag_color = Color;
+    frag_HP = HP;
 
     gl_Position = Projection * View * Model * vec4(new_pos, 1.0);
 }

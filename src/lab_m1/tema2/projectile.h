@@ -16,15 +16,15 @@ namespace m1
 			initial_position = start_pos;
 			this->direction = direction;
 			speed = 5;
-			scale = 0.07;
-			radius = 0.1; // ??????
+			scale = 0.07f;
+			radius = 0.2f;
 			start_time = Engine::GetElapsedTime();
-			ttl = 2 + Engine::GetElapsedTime();
+			ttl = 5 + Engine::GetElapsedTime();
 		}
 
-		glm::vec3 computePosition(float current_time)
+		glm::vec3 computePosition()
 		{
-			float deltaTime = current_time - start_time;
+			float deltaTime = Engine::GetElapsedTime() - start_time;
 			glm::vec3 position = initial_position;
 			position += direction * (speed * deltaTime);
 

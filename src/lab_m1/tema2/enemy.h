@@ -8,5 +8,7 @@ namespace m1
 	{
 	public:
 		TankEnemy(glm::vec3& center);
+
+		float deltaTimeShooting;
 	};
 }

@@ -13,6 +13,17 @@ namespace m1
     class Tema2 : public gfxc::SimpleScene
     {
     public:
+        struct ViewportArea
+        {
+            ViewportArea() : x(0), y(0), width(1), height(1) {}
+            ViewportArea(int x, int y, int width, int height)
+                : x(x), y(y), width(width), height(height) {}
+            int x;
+            int y;
+            int width;
+            int height;
+        };
+
         Tema2();
         ~Tema2();
 
@@ -27,6 +38,7 @@ namespace m1
         void RenderBuilding(Building& building);
         void RenderTankComponent(Tank& tank, Mesh* mesh, Shader* shader, TankComponent component);
         void RenderMesh(Mesh* mesh, Shader* shader, const glm::mat4& modelMatrix, const glm::vec3 color);
+        void RenderAll();
         void LoadMeshes();
 
         void GenerateBuildings();
@@ -48,6 +60,8 @@ namespace m1
 
     protected:
         player::Camera* camera;
+        player::Camera* perspectiveCamera;
+        player::Camera* orthoCamera;
         glm::mat4 projectionMatrix;
 
         Tank* tank;
@@ -61,8 +75,11 @@ namespace m1
 
         float fov;
         float zNear, zFar;
+        float right, left, bottom, top;
 
         // The renderer object
         gfxc::TextRenderer* textRenderer;
+
+        ViewportArea miniViewportArea;
     };
 }   // namespace m1

@@ -3,6 +3,8 @@
 #include "utils/glm_utils.h"
 #include "utils/math_utils.h"
 
+#include <iostream>
+
 namespace player
 {
     class Camera
@@ -15,11 +17,22 @@ namespace player
             up          = glm::vec3(0, 1, 0);
             right       = glm::vec3(1, 0, 0);
             distanceToTarget = 3;
+            isOrtho = false;
         }
 
-        Camera(const glm::vec3 &position, const glm::vec3 &center, const glm::vec3 &up)
+        Camera(const glm::vec3 &position, const glm::vec3 &center, const glm::vec3 &up, bool isOrtho)
         {
             Set(position, center, up);
+            this->isOrtho = isOrtho;
+
+            if (isOrtho)
+            {
+                distanceToTarget = 10;
+            }
+            else
+            {
+                distanceToTarget = 3;
+            }  
         }
 
         ~Camera()
@@ -36,8 +49,14 @@ namespace player
 
         void FollowTarget(const glm::vec3& targetPosition, const float targetRotation)
         {
-            position = targetPosition - forward * distanceToTarget;
-            RotateThirdPerson_OY(-targetRotation);
+            if (!isOrtho) {
+                position = targetPosition - forward * distanceToTarget;
+                RotateThirdPerson_OY(-targetRotation);
+            }
+            else
+            {
+                position = targetPosition - forward * distanceToTarget;
+            }
         }
 
         void MoveForward(float distance)
@@ -115,9 +134,10 @@ namespace player
 
      public:
         float distanceToTarget;
+        bool isOrtho;
         glm::vec3 position;
         glm::vec3 forward;
         glm::vec3 right;
         glm::vec3 up;
     };
-}   // namespace implemented
+}   // namespace player

@@ -37,7 +37,9 @@ namespace m1
 		glm::vec3 color[TANK_COMPONENT_NUM];
 
 		int HP;
+		int numLives;
 		std::vector<Projectile> projectiles;
+		float deltaTimeShooting;
 		float speed;
 
 		void TranslateForward(float distance, TankComponent component);
@@ -48,6 +50,9 @@ namespace m1
 		void Rotate_OX(float angle, TankComponent component);
 		void Rotate_OY(float angle, TankComponent component);
 		void Rotate_OZ(float angle, TankComponent component);
+
+		void Rotate(float angle);
+		void FollowDir(glm::vec3& dir, TankComponent component);
 
 		glm::mat4 GetModelMatrix(TankComponent component);
 	};
