@@ -81,6 +81,11 @@ namespace m1
         float zNear, zFar;
         float right, left, bottom, top;
 
+        float mapBoundXmax;
+        float mapBoundXmin;
+        float mapBoundZmax;
+        float mapBoundZmin;
+
         // The renderer object
         gfxc::TextRenderer* textRenderer;
 

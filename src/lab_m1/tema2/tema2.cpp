@@ -97,7 +97,7 @@ void Tema2::GenerateBuildings()
         if (AreColliding(*tank, b, distance)) {
             glm::vec2 P = distance * glm::normalize(glm::vec2(tank->position.x, tank->position.z)
                 - glm::vec2(b.position.x, b.position.z));
-            b.position -= glm::vec3(P.x, 0, P.y) * 0.1f;
+            b.position -= glm::vec3(P.x, 0, P.y) * 0.5f;
         }
 
         buildings.push_back(b);
@@ -164,6 +164,11 @@ void Tema2::Init()
     bottom = -top;
     right = top * window->props.aspectRatio;
     left = -right;
+
+    mapBoundXmax = 25;
+    mapBoundXmin = -25;
+    mapBoundZmax = 25;
+    mapBoundZmin = -25;
 
     fov = RADIANS(80);
     zNear = 0.01f;
@@ -448,6 +453,22 @@ void Tema2::RenderAll()
             enemy->speed = 0;
         }
 
+        enemy->updatePosition();
+
+        // Bind enemies to land
+        enemy->position.x = max(mapBoundXmin, min(enemy->position.x, mapBoundXmax));
+        enemy->position.z = max(mapBoundZmin, min(enemy->position.z, mapBoundZmax));
+
+        for (auto& building : buildings) {
+            float dist = 0;
+            if (AreColliding(*enemy, building, dist)) {
+                // Taking into consideration only coordinates from the XOZ plane
+                glm::vec2 P = dist * glm::normalize(glm::vec2(enemy->position.x, enemy->position.z)
+                    - glm::vec2(building.position.x, building.position.z));
+                enemy->position += glm::vec3(P.x, 0, P.y) * 0.1f;
+            }
+        }
+
         RenderTank(*enemy);
     }
 
@@ -476,7 +497,12 @@ void Tema2::FrameStart()
 
 void Tema2::Update(float deltaTimeSeconds)
 {
-    if (totalGameTime - Engine::GetElapsedTime() <= 0 || tank->numLives <= 0) {
+    if (tank->numLives <= 0) {
+        textRenderer->RenderText(std::string("You died, dumbass"), 450, 320, 1.5f, glm::vec3(0, 1, 0));
+        return;
+    }
+
+    if (totalGameTime - Engine::GetElapsedTime() <= 0) {
         textRenderer->RenderText(std::string("Game Over"), 450, 320, 1.5f, glm::vec3(0, 1, 0));
         textRenderer->RenderText(std::string("Total Score: ") + to_string(score), 450, 350, 1.5f, glm::vec3(0, 1, 0));
         return;
