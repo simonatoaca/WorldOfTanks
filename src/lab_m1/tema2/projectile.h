@@ -17,7 +17,7 @@ namespace m1
 			this->direction = direction;
 			speed = 5;
 			scale = 0.07f;
-			radius = 0.2f;
+			radius = 0.1f;
 			start_time = Engine::GetElapsedTime();
 			ttl = 5 + Engine::GetElapsedTime();
 		}

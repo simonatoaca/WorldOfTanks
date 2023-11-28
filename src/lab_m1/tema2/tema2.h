@@ -49,6 +49,10 @@ namespace m1
         bool AreColliding(Tank& t, Building& b, float& distance);
         bool AreColliding(Building& b, Projectile& p);
 
+        void EnemyAttacks();
+        void ProjectileCollisions();
+        void TankCollisions();
+
         void OnInputUpdate(float deltaTime, int mods) override;
         void OnKeyPress(int key, int mods) override;
         void OnKeyRelease(int key, int mods) override;

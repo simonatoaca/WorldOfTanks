@@ -92,6 +92,14 @@ void Tema2::GenerateBuildings()
         glm::vec3 scale = glm::vec3(genScale(gen), genScale(gen), genScale(gen));
 
         Building b(position, scale);
+
+        float distance = 0;
+        if (AreColliding(*tank, b, distance)) {
+            glm::vec2 P = distance * glm::normalize(glm::vec2(tank->position.x, tank->position.z)
+                - glm::vec2(b.position.x, b.position.z));
+            b.position -= glm::vec3(P.x, 0, P.y) * 0.1f;
+        }
+
         buildings.push_back(b);
     }
 }
@@ -113,6 +121,23 @@ void Tema2::GenerateEnemies()
         glm::vec3 position = glm::vec3(genPosition(gen), 0, genPosition(gen));
 
         TankEnemy enemy(position);
+
+        float distance = 0;
+        if (AreColliding(*tank, enemy, distance)) {
+            glm::vec2 P = distance * glm::normalize(glm::vec2(tank->position.x, tank->position.z)
+                - glm::vec2(enemy.position.x, enemy.position.z));
+            enemy.position -= glm::vec3(P.x, 0, P.y) * 0.1f;
+        }
+
+        for (auto& b : buildings) {
+            float distance = 0;
+            if (AreColliding(enemy, b, distance)) {
+                glm::vec2 P = distance * glm::normalize(glm::vec2(tank->position.x, tank->position.z)
+                    - glm::vec2(b.position.x, b.position.z));
+                enemy.position += glm::vec3(P.x, 0, P.y) * 0.1f;
+            }
+        }
+
         enemies.push_back(enemy);
     }
 }
@@ -135,7 +160,7 @@ void Tema2::Init()
     totalGameTime = 80 + Engine::GetElapsedTime();
     score = 0;
 
-    top = 4.0f;
+    top = 8.0f;
     bottom = -top;
     right = top * window->props.aspectRatio;
     left = -right;
@@ -218,7 +243,18 @@ bool Tema2::AreColliding(Tank& t1, Tank& t2, float &distance)
 
 bool Tema2::AreColliding(Tank& t, Projectile& p)
 {
-    return (glm::distance(t.position, p.computePosition()) < t.radius + p.radius);
+    glm::vec3 projectile_pos = p.computePosition();
+
+    // The projectile is above the tank
+    if (projectile_pos.z - p.radius > t.position.z + t.radius) {
+        return false;
+    }
+
+    // Project on the XOZ plane
+    glm::vec2 proj_xoz = glm::vec2(projectile_pos.x, projectile_pos.z);
+    glm::vec2 tank_xoz = glm::vec2(t.position.x, t.position.z);
+
+    return (glm::distance(tank_xoz, proj_xoz) < t.radius + p.radius);
 }
 
 bool Tema2::AreColliding(Tank& t, Building& b, float& distance)
@@ -229,20 +265,14 @@ bool Tema2::AreColliding(Tank& t, Building& b, float& distance)
     float zmin = b.position.z - b.radius.z;
     float zmax = b.position.z + b.radius.z;
 
-    float edgeX = b.position.x;
-    float edgeZ = b.position.z;
+    // Clamp sphere coordinates to the closest box coordinates
+    float x = max(xmin, min(t.position.x, xmax));
+    float z = max(zmin, min(t.position.z, zmax));
 
-    if (t.position.x > xmax)  edgeX = xmax;  // The tank is to the right
-    if (t.position.x < xmin)  edgeX = xmin;  // The tank is to the left
+    distance = sqrt((x - t.position.x) * (x - t.position.x) +
+                        (z - t.position.z) * (z - t.position.z));
 
-    if (t.position.z > zmax)  edgeZ = zmax;  // The tank is above
-    if (t.position.z < zmin)  edgeZ = zmin;  // The tank is below
-
-    float distX = t.position.x - edgeX;
-    float distZ = t.position.z - edgeZ;
-
-    if (sqrt(distX * distX + distZ * distZ) < t.radius) {
-        distance = t.radius - sqrt(distX * distX + distZ * distZ);
+    if (distance < t.radius) {
         return true;
     }
 
@@ -251,36 +281,161 @@ bool Tema2::AreColliding(Tank& t, Building& b, float& distance)
 
 bool Tema2::AreColliding(Building& b, Projectile& p)
 {
-    glm::vec3 projectile_pos = p.computePosition();
-    
-    // The projectile is over the building
-    if (projectile_pos.z > b.position.z + b.radius.z) {
-        return false;
-    }
+    glm::vec3 p_pos = p.computePosition();
 
     float xmin = b.position.x - b.radius.x;
     float xmax = b.position.x + b.radius.x;
 
+    float ymin = b.position.y - b.radius.y;
+    float ymax = b.position.y + b.radius.y;
+
     float zmin = b.position.z - b.radius.z;
     float zmax = b.position.z + b.radius.z;
 
-    float edgeX = b.position.x;
-    float edgeZ = b.position.z;
+    // Clamp sphere coordinates to the closest box coordinates
+    float x = max(xmin, min(p_pos.x, xmax));
+    float y = max(ymin, min(p_pos.y, ymax));
+    float z = max(zmin, min(p_pos.z, zmax));
 
-    if (projectile_pos.x > xmax)  edgeX = xmax;
-    if (projectile_pos.x < xmin)  edgeX = xmin;
+    float distance = sqrt((x - p_pos.x) * (x - p_pos.x) +
+                              (y - p_pos.y) * (y - p_pos.y) +
+                              (z - p_pos.z) * (z - p_pos.z));
 
-    if (projectile_pos.z > zmax)  edgeZ = zmax;
-    if (projectile_pos.z < zmin)  edgeZ = zmin;
-
-    float distX = projectile_pos.x - edgeX;
-    float distZ = projectile_pos.z - edgeZ;
-
-    if (sqrt(distX * distX + distZ * distZ) < p.radius) {
+    if (distance < p.radius) {
         return true;
     }
 
     return false;
+}
+
+void Tema2::EnemyAttacks()
+{
+    for (auto& enemy : enemies) {
+        if (!enemy.HP) {
+            continue;
+        }
+
+        if (glm::distance(tank->position, enemy.position) < 7) {
+            glm::vec3 dir = glm::normalize(tank->position - enemy.position);
+
+            // Point gun towards player
+            if (dir != enemy.forward[TURRET]) {
+                enemy.FollowDir(dir, TURRET);
+                enemy.FollowDir(dir, MACHINE_GUN);
+            }
+
+            if (enemy.deltaTimeShooting - Engine::GetElapsedTime() < 0) {
+                glm::vec3 gun_rel_pos = glm::vec3(0, 0.56, 0) + enemy.forward[MACHINE_GUN];
+                enemy.projectiles.push_back(Projectile(enemy.position + gun_rel_pos, enemy.forward[MACHINE_GUN]));
+
+                enemy.deltaTimeShooting = 2.f + Engine::GetElapsedTime();
+            }
+        }
+    }
+}
+
+void Tema2::ProjectileCollisions()
+{
+    // Projectile - Building collisions
+    for (auto& building : buildings) {
+        for (auto& projectile = tank->projectiles.begin(); projectile != tank->projectiles.end(); projectile++) {
+            if (AreColliding(building, *projectile)) {
+                projectile = tank->projectiles.erase(projectile);
+
+                if (projectile == tank->projectiles.end()) {
+                    break;
+                }
+            }
+        }
+
+        for (auto& enemy : enemies) {
+            for (auto& projectile = enemy.projectiles.begin(); projectile != enemy.projectiles.end(); projectile++) {
+                if (AreColliding(building, *projectile)) {
+                    projectile = enemy.projectiles.erase(projectile);
+
+                    if (projectile == enemy.projectiles.end()) {
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    // Projectile - Enemy collisions
+    for (auto& projectile = tank->projectiles.begin(); projectile != tank->projectiles.end(); projectile++) {
+        for (auto& enemy : enemies) {
+            if (AreColliding(enemy, *projectile)) {
+                enemy.HP--;
+
+                if (enemy.HP == 0) {
+                    score++;
+                }
+
+                enemy.HP = enemy.HP < 0 ? 0 : enemy.HP;
+
+                projectile = tank->projectiles.erase(projectile);
+
+                if (projectile == tank->projectiles.end()) {
+                    break;
+                }
+            }
+        }
+        break;
+    }
+
+    // Enemy projectiles - Tank collisions
+    for (auto& enemy : enemies) {
+        for (auto& projectile = enemy.projectiles.begin(); projectile != enemy.projectiles.end(); projectile++) {
+            if (AreColliding(*tank, *projectile)) {
+                tank->numLives--;
+
+                if (tank->numLives <= 0) {
+                    tank->speed = 0;
+                }
+
+                projectile = enemy.projectiles.erase(projectile);
+
+                if (projectile == enemy.projectiles.end()) {
+                    break;
+                }
+            }
+        }
+    }
+}
+
+void Tema2::TankCollisions()
+{
+    // Tank - Tank collisions
+    for (auto& enemy : enemies) {
+        float dist = 0;
+        if (AreColliding(*tank, enemy, dist)) {
+            // Move tanks away from eachother so they don't intersect anymore
+            glm::vec3 P = dist * glm::normalize(tank->position - enemy.position);
+            tank->position += P * 0.5f;
+            enemy.position -= P * 0.5f;
+        }
+    }
+
+    // Tank - Building collisions
+    for (auto& building : buildings) {
+        float dist = 0;
+        if (AreColliding(*tank, building, dist)) {
+            // Taking into consideration only coordinates from the XOZ plane
+            glm::vec2 P = dist * glm::normalize(glm::vec2(tank->position.x, tank->position.z)
+                - glm::vec2(building.position.x, building.position.z));
+            tank->position += glm::vec3(P.x, 0, P.y) * 0.1f;
+        }
+
+        // Enemy collisions
+        for (auto& enemy : enemies) {
+            if (AreColliding(enemy, building, dist)) {
+                // Taking into consideration only coordinates from the XOZ plane
+                glm::vec2 P = dist * glm::normalize(glm::vec2(enemy.position.x, enemy.position.z)
+                    - glm::vec2(building.position.x, building.position.z));
+                enemy.position += glm::vec3(P.x, 0, P.y) * 0.1f;
+            }
+        }
+    }
 }
 
 void Tema2::RenderAll()
@@ -331,116 +486,13 @@ void Tema2::Update(float deltaTimeSeconds)
     projectionMatrix = glm::perspective(fov, window->props.aspectRatio, zNear, zFar);
 
     /* ENEMY ATTACKS */
-    for (auto& enemy : enemies) {
-        if (!enemy.HP) {
-            continue;
-        }
 
-        if (glm::distance(tank->position, enemy.position) < 7) {
-            glm::vec3 dir = glm::normalize(tank->position - enemy.position);
-
-            if (dir != enemy.forward[TURRET]) {
-                enemy.FollowDir(dir, TURRET);
-                enemy.FollowDir(dir, MACHINE_GUN);
-            }
-
-            if (enemy.deltaTimeShooting - Engine::GetElapsedTime() < 0) {
-                glm::vec3 gun_rel_pos = glm::vec3(0, 0.56, 0) + enemy.forward[MACHINE_GUN];
-                enemy.projectiles.push_back(Projectile(enemy.position + gun_rel_pos, enemy.forward[MACHINE_GUN]));
-
-                enemy.deltaTimeShooting = 2.f + Engine::GetElapsedTime();
-            }
-        }
-    }
+    EnemyAttacks();
 
     /* COLLISIONS */
 
-    // Tank - Tank collisions
-    for (auto& enemy : enemies) {
-        float dist = 0;
-        if (AreColliding(*tank, enemy, dist)) {
-            // Move tanks away from eachother so they don't intersect anymore
-            glm::vec3 P =  dist * glm::normalize(tank->position - enemy.position);
-            tank->position += P * 0.5f;
-            enemy.position -= P * 0.5f;
-        }
-    }
-
-    // Projectile - Enemy collisions
-    for (auto& projectile = tank->projectiles.begin(); projectile != tank->projectiles.end(); projectile++) {
-        for (auto& enemy : enemies) {
-            if (AreColliding(enemy, *projectile)) {
-                enemy.HP--;
-
-                if (enemy.HP == 0) {
-                    score++;
-                }
-
-                enemy.HP = enemy.HP < 0 ? 0 : enemy.HP;
-
-                projectile = tank->projectiles.erase(projectile);
-
-                if (projectile == tank->projectiles.end()) {
-                    break;
-                }
-            }
-        }
-        break;
-    }
-
-    // Enemy projectiles - Tank collisions
-    for (auto& enemy : enemies) {
-        for (auto& projectile = enemy.projectiles.begin(); projectile != enemy.projectiles.end(); projectile++) {
-            if (AreColliding(*tank, *projectile)) {
-                tank->numLives--;
-
-                if (tank->numLives <= 0) {
-                    tank->speed = 0;
-                }
-
-                projectile = enemy.projectiles.erase(projectile);
-
-                if (projectile == enemy.projectiles.end()) {
-                    break;
-                }
-            }
-        }
-    }
-
-    // Tank - Building collisions
-    for (auto& building : buildings) {
-        float dist = 0;
-        if (AreColliding(*tank, building, dist)) {
-            // Taking into consideration only coordinates from the XOZ plane
-            glm::vec2 P = dist * glm::normalize(glm::vec2(tank->position.x, tank->position.z) 
-                                              - glm::vec2(building.position.x, building.position.z));
-            tank->position += glm::vec3(P.x, 0, P.y) * 2.f;
-        }
-
-        // Enemy collisions
-        for (auto& enemy : enemies) {
-            if (AreColliding(enemy, building, dist)) {
-                // Taking into consideration only coordinates from the XOZ plane
-                glm::vec2 P = dist * glm::normalize(glm::vec2(enemy.position.x, enemy.position.z)
-                    - glm::vec2(building.position.x, building.position.z));
-                enemy.position += glm::vec3(P.x, 0, P.y) * 2.f;
-            }
-        }
-    }
-
-    // Projectile - Building collisions
-    for (auto& projectile = tank->projectiles.begin(); projectile != tank->projectiles.end(); projectile++) {
-        for (auto& building : buildings) {
-            if (AreColliding(building, *projectile)) {
-                projectile = tank->projectiles.erase(projectile);
-
-                if (projectile == tank->projectiles.end()) {
-                    break;
-                }
-            }
-        }
-        break;
-    }
+    TankCollisions();
+    ProjectileCollisions();
 
     /* RENDERING */
     
