@@ -157,7 +157,8 @@ void Tema2::Init()
 
     camera = perspectiveCamera;
 
-    totalGameTime = 80 + Engine::GetElapsedTime();
+    float gameTime = 120; // 2 minutes
+    totalGameTime = gameTime + Engine::GetElapsedTime();
     score = 0;
 
     top = 8.0f;
@@ -250,16 +251,7 @@ bool Tema2::AreColliding(Tank& t, Projectile& p)
 {
     glm::vec3 projectile_pos = p.computePosition();
 
-    // The projectile is above the tank
-    if (projectile_pos.z - p.radius > t.position.z + t.radius) {
-        return false;
-    }
-
-    // Project on the XOZ plane
-    glm::vec2 proj_xoz = glm::vec2(projectile_pos.x, projectile_pos.z);
-    glm::vec2 tank_xoz = glm::vec2(t.position.x, t.position.z);
-
-    return (glm::distance(tank_xoz, proj_xoz) < t.radius + p.radius);
+    return (glm::distance(t.position, projectile_pos) < t.radius + p.radius);
 }
 
 bool Tema2::AreColliding(Tank& t, Building& b, float& distance)
@@ -367,8 +359,8 @@ void Tema2::ProjectileCollisions()
     }
 
     // Projectile - Enemy collisions
-    for (auto& projectile = tank->projectiles.begin(); projectile != tank->projectiles.end(); projectile++) {
-        for (auto& enemy : enemies) {
+    for (auto& enemy : enemies) {
+        for (auto& projectile = tank->projectiles.begin(); projectile != tank->projectiles.end(); projectile++) {
             if (AreColliding(enemy, *projectile)) {
                 enemy.HP--;
 
@@ -385,7 +377,6 @@ void Tema2::ProjectileCollisions()
                 }
             }
         }
-        break;
     }
 
     // Enemy projectiles - Tank collisions
@@ -428,7 +419,7 @@ void Tema2::TankCollisions()
             // Taking into consideration only coordinates from the XOZ plane
             glm::vec2 P = dist * glm::normalize(glm::vec2(tank->position.x, tank->position.z)
                 - glm::vec2(building.position.x, building.position.z));
-            tank->position += glm::vec3(P.x, 0, P.y) * 0.1f;
+            tank->position += glm::vec3(P.x, 0, P.y) * 0.05f;
         }
 
         // Enemy collisions
@@ -437,7 +428,7 @@ void Tema2::TankCollisions()
                 // Taking into consideration only coordinates from the XOZ plane
                 glm::vec2 P = dist * glm::normalize(glm::vec2(enemy.position.x, enemy.position.z)
                     - glm::vec2(building.position.x, building.position.z));
-                enemy.position += glm::vec3(P.x, 0, P.y) * 0.1f;
+                enemy.position += glm::vec3(P.x, 0, P.y) * 0.05f;
             }
         }
     }

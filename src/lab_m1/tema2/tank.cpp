@@ -21,7 +21,7 @@ Tank::Tank(glm::vec3& center)
 	color[WHEELS] = tankColors[GRAY];
 
 	HP = 3;
-	numLives = 3;
+	numLives = 5;
 	deltaTimeShooting = Engine::GetElapsedTime();
 	radius = 1; // One unit in the grid
 	speed = 2.f;
