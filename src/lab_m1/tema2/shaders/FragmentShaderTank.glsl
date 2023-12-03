@@ -12,6 +12,6 @@ layout(location = 0) out vec4 out_color;
 
 void main()
 {
-    vec3 new_color = frag_color + (3 - frag_HP) * vec3(0.2, 0.1, 0.1);
+    vec3 new_color = frag_color - (3 - frag_HP) * vec3(0.08, 0.08, 0.08);
     out_color = vec4(new_color, 1);
 }

@@ -63,6 +63,8 @@ namespace m1
         void OnWindowResize(int width, int height) override;
 
     protected:
+        bool gameOver;
+
         player::Camera* camera;
         player::Camera* perspectiveCamera;
         player::Camera* orthoCamera;

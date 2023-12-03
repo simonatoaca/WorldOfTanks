@@ -144,6 +144,8 @@ void Tema2::GenerateEnemies()
 
 void Tema2::Init()
 {
+    gameOver = false;
+
     tank = new Tank(glm::vec3(0, 0, 0));
 
     GenerateBuildings();
@@ -157,7 +159,7 @@ void Tema2::Init()
 
     camera = perspectiveCamera;
 
-    float gameTime = 120; // 2 minutes
+    float gameTime = 90; // 1.5 minutes
     totalGameTime = gameTime + Engine::GetElapsedTime();
     score = 0;
 
@@ -444,19 +446,21 @@ void Tema2::RenderAll()
             enemy->speed = 0;
         }
 
-        enemy->updatePosition();
+        if (!gameOver) {
+            enemy->updatePosition();
 
-        // Bind enemies to land
-        enemy->position.x = max(mapBoundXmin, min(enemy->position.x, mapBoundXmax));
-        enemy->position.z = max(mapBoundZmin, min(enemy->position.z, mapBoundZmax));
+            // Bind enemies to land
+            enemy->position.x = max(mapBoundXmin, min(enemy->position.x, mapBoundXmax));
+            enemy->position.z = max(mapBoundZmin, min(enemy->position.z, mapBoundZmax));
 
-        for (auto& building : buildings) {
-            float dist = 0;
-            if (AreColliding(*enemy, building, dist)) {
-                // Taking into consideration only coordinates from the XOZ plane
-                glm::vec2 P = dist * glm::normalize(glm::vec2(enemy->position.x, enemy->position.z)
-                    - glm::vec2(building.position.x, building.position.z));
-                enemy->position += glm::vec3(P.x, 0, P.y) * 0.1f;
+            for (auto& building : buildings) {
+                float dist = 0;
+                if (AreColliding(*enemy, building, dist)) {
+                    // Taking into consideration only coordinates from the XOZ plane
+                    glm::vec2 P = dist * glm::normalize(glm::vec2(enemy->position.x, enemy->position.z)
+                        - glm::vec2(building.position.x, building.position.z));
+                    enemy->position += glm::vec3(P.x, 0, P.y) * 0.1f;
+                }
             }
         }
 
@@ -488,17 +492,6 @@ void Tema2::FrameStart()
 
 void Tema2::Update(float deltaTimeSeconds)
 {
-    if (tank->numLives <= 0) {
-        textRenderer->RenderText(std::string("You died, dumbass"), 450, 320, 1.5f, glm::vec3(0, 1, 0));
-        return;
-    }
-
-    if (totalGameTime - Engine::GetElapsedTime() <= 0) {
-        textRenderer->RenderText(std::string("Game Over"), 450, 320, 1.5f, glm::vec3(0, 1, 0));
-        textRenderer->RenderText(std::string("Total Score: ") + to_string(score), 450, 350, 1.5f, glm::vec3(0, 1, 0));
-        return;
-    }
-
     camera = perspectiveCamera;
     projectionMatrix = glm::perspective(fov, window->props.aspectRatio, zNear, zFar);
 
@@ -515,8 +508,22 @@ void Tema2::Update(float deltaTimeSeconds)
     
     RenderAll();
 
-    // MiniViewport
     glClear(GL_DEPTH_BUFFER_BIT);
+
+    // Render end of game messages
+    if (tank->numLives <= 0) {
+        textRenderer->RenderText(std::string("You died"), 550, 320, 1.5f, glm::vec3(0, 0, 0));
+        tank->speed = 0;
+        gameOver = true;
+    }
+    else if (totalGameTime - Engine::GetElapsedTime() <= 0) {
+        textRenderer->RenderText(std::string("Game Over"), 500, 320, 1.5f, glm::vec3(0, 0, 0));
+        textRenderer->RenderText(std::string("Total Score: ") + to_string(score), 500, 350, 1.5f, glm::vec3(0, 0, 0));
+        tank->speed = 0;
+        gameOver = true;
+    }
+
+    // MiniViewport
     glViewport(miniViewportArea.x, miniViewportArea.y, miniViewportArea.width, miniViewportArea.height);
 
     camera = orthoCamera;
