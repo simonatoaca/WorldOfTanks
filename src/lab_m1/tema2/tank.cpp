@@ -48,11 +48,10 @@ void Tank::MoveBackward(float deltaTime)
 
 void Tank::Rotate_OX(float angle, TankComponent component)
 {
-	gunAngleOX += angle;
-	gunAngleOX = gunAngleOX < 0 ? 0 : gunAngleOX > 60 ? 60 : gunAngleOX;
-	/*forward[component] = glm::normalize(glm::vec3(glm::rotate(glm::mat4(1), angle, right[component]) *
-						 glm::vec4(forward[component], 1)));*/
-						 //up[component] = glm::cross(right[component], forward[component]);
+	forward[component] = glm::normalize(glm::vec3(glm::rotate(glm::mat4(1), angle, right[component]) *
+						 glm::vec4(forward[component], 1)));
+
+	up[component] = glm::cross(right[component], forward[component]);
 }
 
 void Tank::Rotate_OY(float angle, TankComponent component)
@@ -94,21 +93,29 @@ glm::mat4 Tank::GetModelMatrix(TankComponent component)
 	angleOY[component] = -atan2(right[component].z, right[component].x);
 
 	if (component == MACHINE_GUN) {
-		//gunAngleOX = atan2(forward[component].y, glm::length(glm::vec2(forward[component].x, forward[component].z)));
-		//gunAngleOX = gunAngleOX > RADIANS(45) ? RADIANS(45) : (gunAngleOX < RADIANS(0) ? RADIANS(0) : gunAngleOX);
-
-		//std::cout << "Angle OY: " << DEGREES(angleOY[component]) << " Angle OX: " << DEGREES(gunAngleOX) << std::endl;
+		gunAngleOX = atan2(forward[component].y, glm::length(glm::vec2(forward[component].x, forward[component].z)));
+		
+		// Limit range of motion
+		if (gunAngleOX <= 0) {
+			gunAngleOX = 0;
+			forward[MACHINE_GUN] = forward[TURRET];
+			right[MACHINE_GUN] = right[TURRET];
+			up[MACHINE_GUN] = up[MACHINE_GUN];
+		}
 
 		/* Relative position to the tank's center */
-		glm::vec3 gun_rel_pos = glm::vec3(0.25 * cos(angleOY[component] + RADIANS(90)), 0.56,
-			0.25 * sin(angleOY[component] - RADIANS(90)));
+		glm::vec3 gun_rel_pos = glm::vec3(0.25 * cos(angleOY[TURRET] + RADIANS(90)), 0.56,
+			0.25 * sin(angleOY[TURRET] - RADIANS(90)));
 
 		modelMatrix = glm::translate(modelMatrix, gun_rel_pos);
-		modelMatrix = glm::rotate(modelMatrix, gunAngleOX, right[component]);
+		modelMatrix = glm::rotate(modelMatrix, gunAngleOX, right[TURRET]);
 		modelMatrix = glm::translate(modelMatrix, -gun_rel_pos);
+		modelMatrix = glm::rotate(modelMatrix, angleOY[TURRET], up[TURRET]);
+	}
+	else {
+		modelMatrix = glm::rotate(modelMatrix, angleOY[component], up[component]);
 	}
 
-	modelMatrix = glm::rotate(modelMatrix, angleOY[component], up[component]);
 	modelMatrix = glm::scale(modelMatrix, glm::vec3(0.7));
 
 	return modelMatrix;

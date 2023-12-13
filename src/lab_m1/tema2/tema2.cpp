@@ -134,7 +134,7 @@ void Tema2::GenerateEnemies()
             if (AreColliding(enemy, b, distance)) {
                 glm::vec2 P = distance * glm::normalize(glm::vec2(tank->position.x, tank->position.z)
                     - glm::vec2(b.position.x, b.position.z));
-                enemy.position += glm::vec3(P.x, 0, P.y) * 0.1f;
+                enemy.position += glm::vec3(P.x, 0, P.y) * 0.5f;
             }
         }
 
@@ -269,9 +269,10 @@ bool Tema2::AreColliding(Tank& t, Building& b, float& distance)
     float z = max(zmin, min(t.position.z, zmax));
 
     distance = sqrt((x - t.position.x) * (x - t.position.x) +
-                        (z - t.position.z) * (z - t.position.z));
+                    (z - t.position.z) * (z - t.position.z));
 
     if (distance < t.radius) {
+        distance = t.radius - distance;
         return true;
     }
 
@@ -314,18 +315,45 @@ void Tema2::EnemyAttacks()
             continue;
         }
 
-        if (glm::distance(tank->position, enemy.position) < 7) {
+        float dist = glm::distance(tank->position, enemy.position);
+
+        if (dist < 7) {
             glm::vec3 dir = glm::normalize(tank->position - enemy.position);
 
             // Point gun towards player
-            if (dir != enemy.forward[TURRET]) {
-                enemy.FollowDir(dir, TURRET);
-                enemy.FollowDir(dir, MACHINE_GUN);
+            float enemyAngleOX = atan2(enemy.forward[TURRET].z, enemy.forward[TURRET].x);
+            float dirAngleOX = atan2(dir.z, dir.x);
+            
+            // Convert to angles in 360 degrees space
+            enemyAngleOX = enemyAngleOX < 0 ? (2 * glm::pi<float>() + enemyAngleOX) : enemyAngleOX;
+            dirAngleOX = dirAngleOX < 0 ? (2 * glm::pi<float>() + dirAngleOX) : dirAngleOX;
+
+            // Move gun until the player is in range
+            if (abs(enemyAngleOX - dirAngleOX) > RADIANS(10)) {
+                int sign = -1;
+                if (enemyAngleOX > dirAngleOX && abs(enemyAngleOX - dirAngleOX) < glm::pi<float>()) {
+                    sign = 1;
+                }
+
+                enemy.Rotate_OY(RADIANS(2) * sign, TURRET);
+                enemy.Rotate_OY(RADIANS(2) * sign, MACHINE_GUN);
+                return;
             }
 
+            //// Raise the gun
+            /*float angle = DEGREES(asin((dist / 25)) / 2);
+            std::cout << angle << std::endl;
+            enemy.Rotate_OX(-angle, MACHINE_GUN);*/
+
+           
+            // The tank is in the gun range, shoot
             if (enemy.deltaTimeShooting - Engine::GetElapsedTime() < 0) {
-                glm::vec3 gun_rel_pos = glm::vec3(0, 0.56, 0) + enemy.forward[MACHINE_GUN];
-                enemy.projectiles.push_back(Projectile(enemy.position + gun_rel_pos, enemy.forward[MACHINE_GUN]));
+                /* Relative position to the tank's center */
+                glm::vec3 gun_rel_pos = glm::vec3(0.25 * cos(enemy.angleOY[TURRET] + RADIANS(90)), 0.56,
+                    0.25 * sin(enemy.angleOY[TURRET] - RADIANS(90)));
+
+                enemy.projectiles.push_back(Projectile(enemy.position + gun_rel_pos + enemy.forward[MACHINE_GUN] * glm::vec3(0.7),
+                                                        enemy.forward[MACHINE_GUN]));
 
                 enemy.deltaTimeShooting = 2.f + Engine::GetElapsedTime();
             }
@@ -421,7 +449,7 @@ void Tema2::TankCollisions()
             // Taking into consideration only coordinates from the XOZ plane
             glm::vec2 P = dist * glm::normalize(glm::vec2(tank->position.x, tank->position.z)
                 - glm::vec2(building.position.x, building.position.z));
-            tank->position += glm::vec3(P.x, 0, P.y) * 0.05f;
+            tank->position += glm::vec3(P.x, 0, P.y) * 0.5f;
         }
 
         // Enemy collisions
@@ -496,8 +524,9 @@ void Tema2::Update(float deltaTimeSeconds)
     projectionMatrix = glm::perspective(fov, window->props.aspectRatio, zNear, zFar);
 
     /* ENEMY ATTACKS */
-
-    EnemyAttacks();
+    if (!gameOver) {
+        EnemyAttacks();
+    }
 
     /* COLLISIONS */
 
@@ -522,6 +551,13 @@ void Tema2::Update(float deltaTimeSeconds)
         tank->speed = 0;
         gameOver = true;
     }
+    else {
+        // Render game info
+        textRenderer->RenderText(std::string("Lives: ") + to_string(tank->numLives) + std::string("/5"),
+            30, 30, 1.5f, glm::vec3(0, 0, 0));
+        textRenderer->RenderText(std::string("Time left: ") + to_string((int)round(totalGameTime - Engine::GetElapsedTime())),
+            30, 60, 1.5f, glm::vec3(0, 0, 0));
+    }
 
     // MiniViewport
     glViewport(miniViewportArea.x, miniViewportArea.y, miniViewportArea.width, miniViewportArea.height);
@@ -534,7 +570,7 @@ void Tema2::Update(float deltaTimeSeconds)
 
 void Tema2::FrameEnd()
 {
-    //DrawCoordinateSystem(camera->GetViewMatrix(), projectionMatrix);
+   
 }
 
 void Tema2::RenderTankComponent(Tank& tank, Mesh* mesh, Shader* shader, TankComponent component)
@@ -624,14 +660,14 @@ void Tema2::OnKeyRelease(int key, int mods)
 void Tema2::OnMouseMove(int mouseX, int mouseY, int deltaX, int deltaY)
 {
     float sensivityOX = 0.002f;
-    float sensivityOY = 0.001f;
+    float sensivityOY = 0.002f;
     if (window->MouseHold(GLFW_MOUSE_BUTTON_RIGHT)) {
         perspectiveCamera->RotateThirdPerson_OX(deltaY * sensivityOX);
         perspectiveCamera->RotateThirdPerson_OY(deltaX * sensivityOY);
     }
     else 
     {
-        //tank->Rotate_OX(-deltaY * sensivityOY, MACHINE_GUN);
+        tank->Rotate_OX(-deltaY * sensivityOY, MACHINE_GUN);
         tank->Rotate_OY(-deltaX * sensivityOX, TURRET);
         tank->Rotate_OY(-deltaX * sensivityOX, MACHINE_GUN);
     }
@@ -639,10 +675,13 @@ void Tema2::OnMouseMove(int mouseX, int mouseY, int deltaX, int deltaY)
 
 void Tema2::OnMouseBtnPress(int mouseX, int mouseY, int button, int mods)
 {
-    if (IS_BIT_SET(button, GLFW_MOUSE_BUTTON_LEFT) && tank->deltaTimeShooting - Engine::GetElapsedTime() <= 0) {
+    if (IS_BIT_SET(button, GLFW_MOUSE_BUTTON_LEFT) && tank->deltaTimeShooting - Engine::GetElapsedTime() <= 0 && !gameOver) {
         /* Relative front of the gun position */
-        glm::vec3 gun_rel_pos = glm::vec3(0, 0.56, 0) + tank->forward[MACHINE_GUN];
-        tank->projectiles.push_back(Projectile(tank->position + gun_rel_pos, tank->forward[MACHINE_GUN]));
+        glm::vec3 gun_rel_pos = glm::vec3(0.25 * cos(tank->angleOY[TURRET] + RADIANS(90)), 0.56,
+            0.25 * sin(tank->angleOY[TURRET] - RADIANS(90)));
+
+        tank->projectiles.push_back(Projectile(tank->position + gun_rel_pos + tank->forward[MACHINE_GUN] * glm::vec3(0.7),
+                                               tank->forward[MACHINE_GUN]));
         tank->deltaTimeShooting = 1.5f + Engine::GetElapsedTime();
     }
 }

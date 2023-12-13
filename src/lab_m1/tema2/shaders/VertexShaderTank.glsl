@@ -24,7 +24,7 @@ void main()
 {
     vec3 new_pos = v_position + sin(3.14 / 4 * (3 - HP)) * (vec3(1, 1, 1) - v_normal) / 10; // DECENT
 
-    frag_position =  v_position;
+    frag_position =  new_pos;
     frag_normal = v_normal;
     frag_tex_coords = v_tex_coords;
     frag_color = Color;

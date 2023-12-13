@@ -10,7 +10,7 @@ TankEnemy::TankEnemy(glm::vec3& center) : Tank(center)
 	color[TURRET] = tankColors[LIGHT_ORANGE];
 	currentState = FORWARD;
 	expirationTime = -1 + Engine::GetElapsedTime();
-	speed = 1.f; // Slower than the player's tank
+	speed = 1.f;		// Slower than the player's tank
 }
 
 void TankEnemy::updatePosition()
