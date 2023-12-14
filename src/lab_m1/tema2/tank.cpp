@@ -7,7 +7,7 @@ Tank::Tank(glm::vec3& center)
 {
 	for (auto& component : { TURRET, MACHINE_GUN, BODY, WHEELS }) {
 		forward[component] = glm::vec3(0, 0, -1);
-		up[component] = glm::vec3(0, 1, 0);
+		up = glm::vec3(0, 1, 0);
 		right[component] = glm::vec3(1, 0, 0);
 		angleOY[component] = 0;
 	}
@@ -50,23 +50,20 @@ void Tank::Rotate_OX(float angle, TankComponent component)
 {
 	forward[component] = glm::normalize(glm::vec3(glm::rotate(glm::mat4(1), angle, right[component]) *
 						 glm::vec4(forward[component], 1)));
-
-	up[component] = glm::cross(right[component], forward[component]);
 }
 
 void Tank::Rotate_OY(float angle, TankComponent component)
 {
-	forward[component] = glm::normalize(glm::vec3(glm::rotate(glm::mat4(1), angle, up[component]) *
+	forward[component] = glm::normalize(glm::vec3(glm::rotate(glm::mat4(1), angle, up) *
 		glm::vec4(forward[component], 1)));
-	right[component] = glm::normalize(glm::vec3(glm::rotate(glm::mat4(1), angle, up[component]) *
+	right[component] = glm::normalize(glm::vec3(glm::rotate(glm::mat4(1), angle, up) *
 		glm::vec4(right[component], 1)));
-	up[component] = glm::cross(right[component], forward[component]);
 }
 
 void Tank::Rotate_OZ(float angle, TankComponent component)
 {
 	right[component] = glm::normalize(glm::vec3(glm::rotate(glm::mat4(1), angle, forward[component]) * glm::vec4(right[component], 1)));
-	up[component] = glm::normalize(glm::vec3(glm::rotate(glm::mat4(1), angle, forward[component]) * glm::vec4(up[component], 1)));
+	up = glm::normalize(glm::vec3(glm::rotate(glm::mat4(1), angle, forward[component]) * glm::vec4(up, 1)));
 }
 
 void Tank::Rotate(float angle)
@@ -80,9 +77,9 @@ void Tank::Rotate(float angle)
 void Tank::FollowDir(glm::vec3& dir, TankComponent component)
 {
 	forward[component] = dir;
-	right[component] = glm::normalize(glm::vec3(glm::rotate(glm::mat4(1), RADIANS(-90), up[component]) *
+	right[component] = glm::normalize(glm::vec3(glm::rotate(glm::mat4(1), RADIANS(-90), up) *
 		glm::vec4(forward[component], 1)));
-	up[component] = glm::cross(right[component], forward[component]);
+	up = glm::cross(right[component], forward[component]);
 }
 
 glm::mat4 Tank::GetModelMatrix(TankComponent component)
@@ -110,10 +107,10 @@ glm::mat4 Tank::GetModelMatrix(TankComponent component)
 		modelMatrix = glm::translate(modelMatrix, gun_rel_pos);
 		modelMatrix = glm::rotate(modelMatrix, gunAngleOX, right[TURRET]);
 		modelMatrix = glm::translate(modelMatrix, -gun_rel_pos);
-		modelMatrix = glm::rotate(modelMatrix, angleOY[TURRET], up[TURRET]);
+		modelMatrix = glm::rotate(modelMatrix, angleOY[TURRET], up);
 	}
 	else {
-		modelMatrix = glm::rotate(modelMatrix, angleOY[component], up[component]);
+		modelMatrix = glm::rotate(modelMatrix, angleOY[component], up);
 	}
 
 	modelMatrix = glm::scale(modelMatrix, glm::vec3(0.7));

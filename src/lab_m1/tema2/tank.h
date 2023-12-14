@@ -27,7 +27,7 @@ namespace m1
 		/* Position-related vars */
 		glm::vec3 position;
 		glm::vec3 forward[TANK_COMPONENT_NUM];
-		glm::vec3 up[TANK_COMPONENT_NUM];
+		glm::vec3 up;
 		glm::vec3 right[TANK_COMPONENT_NUM];
 		float angleOY[TANK_COMPONENT_NUM];
 		float gunAngleOX;

@@ -329,7 +329,7 @@ void Tema2::EnemyAttacks()
             dirAngleOX = dirAngleOX < 0 ? (2 * glm::pi<float>() + dirAngleOX) : dirAngleOX;
 
             // Move gun until the player is in range
-            if (abs(enemyAngleOX - dirAngleOX) > RADIANS(10)) {
+            if (abs(enemyAngleOX - dirAngleOX) > RADIANS(5)) {
                 int sign = -1;
                 if (enemyAngleOX > dirAngleOX && abs(enemyAngleOX - dirAngleOX) < glm::pi<float>()) {
                     sign = 1;
@@ -340,11 +340,17 @@ void Tema2::EnemyAttacks()
                 return;
             }
 
-            //// Raise the gun
-            /*float angle = DEGREES(asin((dist / 25)) / 2);
-            std::cout << angle << std::endl;
-            enemy.Rotate_OX(-angle, MACHINE_GUN);*/
-
+            // Raise the gun
+            float gunAngleOX = atan2(enemy.forward[MACHINE_GUN].y, 
+                                    glm::length(glm::vec2(enemy.forward[MACHINE_GUN].x, enemy.forward[MACHINE_GUN].z)));
+            float angle = asin((dist / 25)) / 2;
+            
+            if (gunAngleOX > angle) {
+                enemy.Rotate_OX(-RADIANS(1), MACHINE_GUN);
+            }
+            else if (gunAngleOX < angle) {
+                enemy.Rotate_OX(RADIANS(1), MACHINE_GUN);
+            }
            
             // The tank is in the gun range, shoot
             if (enemy.deltaTimeShooting - Engine::GetElapsedTime() < 0) {
